@@ -1,0 +1,267 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Integrated Pomodoro Timer and PDF Viewer</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin: 0;
+            padding: 20px;
+            background-color: #f7f7f7;
+        }
+        .upload-container {
+            margin-bottom: 20px;
+            margin-left: -50px;
+        }
+        .pdf-viewer {
+            width: 70%;
+            height: 600px;
+            border: 1px solid #ddd;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            margin-left: -50px;
+        }
+        .pomodoro-container {
+            background-color: #f8f9fa;
+            border-radius: 12px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+            width: 300px;
+            text-align: center;
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            cursor: move;
+            resize: both;
+            overflow: auto;
+        }
+        .pomodoro-container h1 {
+            font-size: 2em;
+            margin: 0;
+            color: #333;
+        }
+        .pomodoro-container button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            font-size: 1em;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        .pomodoro-container button:hover {
+            background-color: #0056b3;
+        }
+        .pomodoro-container .task-input {
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .pomodoro-container .task-input input {
+            padding: 8px;
+            font-size: 1em;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        .pomodoro-container .task-list {
+            margin-top: 20px;
+        }
+        .pomodoro-container .task-list div {
+            background-color: #f1f1f1;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 10px;
+        }
+        .pomodoro-container .task-list div span {
+            display: inline-block;
+            width: calc(100% - 40px);
+        }
+        .pomodoro-container .task-list div button {
+            background-color: red;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            width: 30px;
+            height: 30px;
+        }
+        #pipButton {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 20px;
+        }
+        #pomodoroVideo {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="upload-container">
+        <label for="pdfUpload">Upload PDF:</label>
+        <input type="file" id="pdfUpload" accept="application/pdf">
+    </div>
+    <iframe id="pdfViewer" class="pdf-viewer"></iframe>
+
+    <div class="pomodoro-container" id="pomodoroContainer">
+        <h1 id="timer">25:00</h1>
+        <button onclick="startTimer()">Start</button>
+        <div class="task-input">
+            <input type="text" id="taskInput" placeholder="Enter task">
+            <button onclick="addTask()">Add Task</button>
+        </div>
+        <div class="task-list" id="taskList"></div>
+        <button id="pipButton">Enter PiP</button>
+    </div>
+    <canvas id="canvas" style="display:none;"></canvas>
+    <video id="pomodoroVideo" muted autoplay></video>
+
+    <script>
+        let timer;
+        let isRunning = false;
+        let time = 1500;
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        function startTimer() {
+            if (!isRunning) {
+                isRunning = true;
+                timer = setInterval(() => {
+                    if (time > 0) {
+                        time--;
+                        updateTimer();
+                        drawToCanvas();
+                    } else {
+                        clearInterval(timer);
+                        isRunning = false;
+                        alert("Time's up!");
+                        closeTimer();
+                    }
+                }, 1000);
+            }
+        }
+
+        function updateTimer() {
+            const minutes = Math.floor(time / 60);
+            const seconds = time % 60;
+            document.getElementById('timer').innerText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+        }
+
+        function addTask() {
+            const taskInput = document.getElementById('taskInput');
+            const taskList = document.getElementById('taskList');
+            if (taskInput.value.trim() !== "") {
+                const taskItem = document.createElement('div');
+                taskItem.innerHTML = `<span>${taskInput.value}</span><button onclick="removeTask(this)">x</button>`;
+                taskList.appendChild(taskItem);
+                taskInput.value = "";
+            }
+        }
+
+        function removeTask(button) {
+            const taskItem = button.parentElement;
+            taskItem.remove();
+        }
+
+        function closeTimer() {
+            document.querySelector('.pomodoro-container').style.display = 'none';
+        }
+
+        function drawToCanvas() {
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+            // Determine the radius based on canvas size
+            const radius = Math.min(canvas.width, canvas.height) / 2 - 20;
+
+            // Draw Pomodoro timer
+            ctx.beginPath();
+            ctx.arc(canvas.width / 2, canvas.height / 2, radius, 0, 2 * Math.PI);
+            ctx.fillStyle = '#f8f9fa';
+            ctx.fill();
+
+            ctx.strokeStyle = '#007bff';
+            ctx.lineWidth = 10;
+            ctx.stroke();
+
+            ctx.font = '48px Arial';
+            ctx.fillStyle = '#333';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+
+            const minutes = Math.floor(time / 60);
+            const seconds = time % 60;
+            const timerText = `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            ctx.fillText(timerText, canvas.width / 2, canvas.height / 2);
+        }
+
+        const pomodoroContainer = document.getElementById('pomodoroContainer');
+
+        // Make the Pomodoro container draggable
+        let posX = 0, posY = 0;
+        let isDragging = false;
+
+        pomodoroContainer.addEventListener('mousedown', function(e) {
+            isDragging = true;
+            posX = e.clientX - parseInt(window.getComputedStyle(pomodoroContainer).left);
+            posY = e.clientY - parseInt(window.getComputedStyle(pomodoroContainer).top);
+        });
+
+        document.addEventListener('mousemove', function(e) {
+            if (isDragging) {
+                pomodoroContainer.style.left = `${e.clientX - posX}px`;
+                pomodoroContainer.style.top = `${e.clientY - posY}px`;
+            }
+        });
+
+        document.addEventListener('mouseup', function() {
+            isDragging = false;
+        });
+
+        const pipButton = document.getElementById('pipButton');
+        const video = document.getElementById('pomodoroVideo');
+
+        pipButton.addEventListener('click', async function() {
+            if (!document.pictureInPictureElement) {
+                drawToCanvas();
+                video.srcObject = canvas.captureStream();
+                await video.play();
+                try {
+                    await video.requestPictureInPicture();
+                    pipButton.textContent = 'Exit PiP';
+                } catch (error) {
+                    console.error('Error entering PiP mode:', error);
+                }
+            } else {
+                document.exitPictureInPicture().catch(console.error);
+                pipButton.textContent = 'Enter PiP';
+            }
+        });
+
+        video.addEventListener('leavepictureinpicture', () => {
+            pipButton.textContent = 'Enter PiP';
+        });
+
+        document.getElementById('pdfUpload').addEventListener('change', function(event) {
+            const file = event.target.files[0];
+            if (file && file.type === 'application/pdf') {
+                const fileURL = URL.createObjectURL(file);
+                document.getElementById('pdfViewer').src = fileURL;
+            } else {
+                alert('Please upload a valid PDF file.');
+            }
+        });
+    </script>
+</body>
+</html>
